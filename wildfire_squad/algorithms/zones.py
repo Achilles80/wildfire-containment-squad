@@ -41,9 +41,16 @@ class ClusterResult:
     next_id: int = 0
 
 
-def connected_components(mask: np.ndarray) -> list[frozenset[Cell]]:
-    """8-connected components of True cells, in scan order."""
+def connected_components(mask: np.ndarray, link_distance: int = 1) -> list[frozenset[Cell]]:
+    """Connected components of True cells, in scan order.
+
+    Two True cells are linked when their Chebyshev distance is at most ``link_distance``;
+    ``link_distance = 1`` is ordinary 8-connectivity. Larger values keep a ragged fire front
+    that is broken by a few burnt or extinguished cells together as one zone.
+    """
     width, height = mask.shape
+    d = link_distance
+    offsets = tuple((dx, dy) for dx in range(-d, d + 1) for dy in range(-d, d + 1) if (dx, dy) != (0, 0))
     seen = np.zeros_like(mask, dtype=bool)
     components: list[frozenset[Cell]] = []
     for sx, sy in np.argwhere(mask):
@@ -55,7 +62,7 @@ def connected_components(mask: np.ndarray) -> list[frozenset[Cell]]:
         queue = deque([start])
         while queue:
             cell = queue.popleft()
-            for nb in neighbours(cell, width, height, NEIGHBOURS_8):
+            for nb in neighbours(cell, width, height, offsets):
                 if mask[nb] and not seen[nb]:
                     seen[nb] = True
                     comp.append(nb)
@@ -101,6 +108,28 @@ def match_zones(components: list[frozenset[Cell]], previous: dict[int, Zone], ne
             result.new_ids.add(zid)
     result.removed_ids = set(previous) - set(result.zones)
     return result
+
+
+def live_zone_cells(snapshot: Iterable[Cell], burning: np.ndarray) -> frozenset[Cell]:
+    """The zone as it is *now*: burning cells connected to the Coordinator's last snapshot.
+
+    Seeds are snapshot cells that still burn plus burning cells next to the snapshot (the fire
+    has moved on since the last clustering round); the zone is everything 8-connected to them.
+    """
+    width, height = burning.shape
+    snapshot = set(snapshot)
+    seeds = {c for c in snapshot if burning[c]}
+    for c in snapshot:
+        seeds.update(nb for nb in neighbours(c, width, height, NEIGHBOURS_8) if burning[nb])
+    seen = set(seeds)
+    queue = deque(seeds)
+    while queue:
+        cell = queue.popleft()
+        for nb in neighbours(cell, width, height, NEIGHBOURS_8):
+            if burning[nb] and nb not in seen:
+                seen.add(nb)
+                queue.append(nb)
+    return frozenset(seen)
 
 
 def _fuel_believed(belief_state: np.ndarray, fuel: np.ndarray, cell: Cell) -> bool:
@@ -195,9 +224,10 @@ def cluster_zones(
     fire_cfg: dict[str, Any],
     previous: dict[int, Zone],
     next_id: int,
+    link_distance: int = 1,
 ) -> ClusterResult:
     """Cluster believed-burning cells into zones with stable ids, threat and target cell."""
-    comps = connected_components(belief_state == CellState.BURNING)
+    comps = connected_components(belief_state == CellState.BURNING, link_distance)
     result = match_zones(comps, previous, next_id)
     for zone in result.zones.values():
         zone.threat = zone_threat(zone.cells, belief_state, fuel, wind, fire_cfg)

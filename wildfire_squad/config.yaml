@@ -45,15 +45,19 @@ firefighter:
   risk_lambda: 5.0
   replan_every: 10            # also replan immediately if next cell is burning
   blocked_replan_after: 2     # replan if the next cell stays reserved this many steps in a row
+  zone_tactic: utility        # target inside a zone: utility (spread stopped per step of travel) | firebreak (downwind edge, plan §7.2) | nearest
   target_candidates: 5        # impl: firebreak candidates checked for reachability per re-target
   explore_when_idle: true     # impl: free firefighters explore when the team knows of no fire
+  award_timeout: 10           # no AWARD for this many steps while fire is known -> fight nearest fire alone (null = never)
   secure_footing: true        # impl: never fight from fuel: cut own cell first; do not step onto fuel beside fire as it spreads
 
 coordinator:
   cluster_every: 5            # re-cluster zones + run auctions every 5 steps
+  zone_link_distance: 1       # burning cells this close (Chebyshev) share a zone; 1 = 8-connectivity
   large_zone_cells: 20        # zones larger than this are auctioned twice (2 firefighters)
   reauction_after_absent: 15  # re-auction a zone if its firefighter is away refilling > 15 steps
   assign_idle: true           # impl: after the design slots, auction leftover free firefighters too
+  fail_at_step: null          # robustness test: the Coordinator stops working from this step (null = never)
 
 simulation:
   t_max: 300
@@ -61,11 +65,16 @@ simulation:
   preset: null                # null = random forest | river (Scenario 6 map)
   measure_ucs: true           # also run UCS on every A* query (measurement only)
   message_log_size: 200       # recent messages kept for the demo panel
+  oracle_knowledge: false     # studies only: firefighters see the true fire state (upper bound)
 
 presets:
   river:
     x: 25                     # vertical water column
     crossings: [[10, 12], [38, 40]]   # inclusive y-ranges of the 3-cell-wide crossings
+  competing:                  # targeted test of threat-aware allocation (not a Review 1 scenario)
+    near_ignition: [17, 5]    # low-threat fire in sparse forest, close to the base
+    far_ignition: [28, 34]    # high-threat fire in dense forest, farther away
+    patch_radius: 6           # forest type forced around each ignition
 
 score:
   w1: 0.7

@@ -10,7 +10,7 @@ import numpy as np
 from agents.scout import sense_window
 from algorithms.auction import utility
 from algorithms.frontier import select_target
-from algorithms.zones import Zone, firebreak_candidates
+from algorithms.zones import Zone, firebreak_candidates, live_zone_cells
 from belief_map import BeliefMap
 from environment.cells import NEIGHBOURS_4, NEIGHBOURS_8, UNKNOWN, Cell, CellState, manhattan, neighbours
 from environment.fire import ignition_probability
@@ -48,6 +48,10 @@ class Firefighter(mesa.Agent):
         self._explore_selected_step = -1
         self._unreachable: set[Cell] = set()
         self._bid_cache: dict[tuple[int, int], float] = {}
+        self._free_since: int | None = None  # step since which we know of fire but hold no award
+        self._live_zone: Zone | None = None
+        self._live_zone_key: tuple[int, int, int] | None = None
+        self.fallback = False  # acting alone because the Coordinator has gone silent
         # statistics
         self.cells_extinguished = 0
         self.firebreaks_cut = 0
@@ -68,6 +72,8 @@ class Firefighter(mesa.Agent):
             return "refilling"
         if self.assigned_zone is not None:
             return f"zone {self.assigned_zone}"
+        if self.fallback:
+            return "fallback (no award)"
         if self.target_cell is not None:
             return "to fire"
         if self._explore_target is not None:
@@ -78,10 +84,19 @@ class Firefighter(mesa.Agent):
         return int(self.model.state[cell])
 
     def _zone(self) -> Zone | None:
+        """Our assigned zone, tracked live on the belief map between clustering rounds."""
         coordinator = self.model.coordinator
         if coordinator is None or self.assigned_zone is None:
             return None
-        return coordinator.zones.get(self.assigned_zone)
+        snapshot = coordinator.zones.get(self.assigned_zone)
+        if snapshot is None:
+            return None
+        key = (snapshot.zone_id, self.model.steps, self.belief.version)
+        if self._live_zone_key != key:
+            cells = live_zone_cells(snapshot.cells, self.belief.burning_mask())
+            self._live_zone = Zone(snapshot.zone_id, cells, snapshot.threat) if cells else None
+            self._live_zone_key = key
+        return self._live_zone
 
     def _become_free(self) -> None:
         self.assigned_zone = None
@@ -113,8 +128,13 @@ class Firefighter(mesa.Agent):
         elif isinstance(msg, Award):
             self._become_free()
             self.assigned_zone = msg.zone_id
-            self.target_cell = msg.target_cell
+            # the award's target cell is the zone's reference point used to price bids;
+            # with a tactic other than "firebreak" we choose our own cell inside the zone
+            tactic = self.model.cfg["firefighter"]["zone_tactic"]
+            self.target_cell = msg.target_cell if tactic == "firebreak" else None
             self._explore_target = None
+            self._free_since = None
+            self.fallback = False
         elif isinstance(msg, Revoke):
             if msg.zone_id == self.assigned_zone:
                 self._become_free()
@@ -203,13 +223,44 @@ class Firefighter(mesa.Agent):
         s = self.belief.state[cell]
         return s == CellState.TREE or (s == UNKNOWN and self.model.fuel[cell] > 0)
 
+    def _spread_value(self, b: Cell) -> float:
+        """Expected ignitions per fire update that burning cell ``b`` threatens (believed fuel only)."""
+        m = self.model
+        return sum(
+            ignition_probability(b, n, float(m.fuel[n]), m.wind, m.cfg["fire"])
+            for n in neighbours(b, m.width, m.height, NEIGHBOURS_8)
+            if self._is_fuel(n)
+        )
+
+    def _utility_candidates(self, zone: Zone) -> list[Cell]:
+        """Burning cells of the zone ranked by spread stopped per step of travel.
+
+        ``value(b) = spread threatened by b / (1 + distance)``; cells a teammate already targets
+        are skipped so two firefighters do not queue for the same cell.
+        """
+        m = self.model
+        taken = {ff.target_cell for ff in m.firefighters if ff is not self and ff.target_cell is not None}
+        burning = [c for c in zone.cells if self.belief.state[c] == CellState.BURNING and c not in taken]
+        scored = [(self._spread_value(b) / (1 + manhattan(self.pos, b)), b) for b in burning]
+        return [b for v, b in sorted(scored, key=lambda vb: (-vb[0], vb[1])) if v > 0]
+
     def _choose_zone_target(self) -> None:
-        """Firebreak target: reachable downwind edge cell of our zone with the largest projection."""
+        """Pick our target inside the assigned zone (see ``firefighter.zone_tactic``)."""
         zone = self._zone()
         if zone is None:
             return
         m = self.model
-        cands = firebreak_candidates(zone, self.belief.state, m.fuel, m.wind, from_pos=self.pos)
+        tactic = m.cfg["firefighter"]["zone_tactic"]
+        cands: list[Cell] = []
+        if tactic == "utility":
+            cands = self._utility_candidates(zone)
+        elif tactic == "nearest":
+            cands = sorted(
+                (c for c in zone.cells if self.belief.state[c] == CellState.BURNING),
+                key=lambda c: (manhattan(self.pos, c), c),
+            )
+        if not cands:  # "firebreak" tactic, or nothing left to put out: downwind firebreak edge
+            cands = firebreak_candidates(zone, self.belief.state, m.fuel, m.wind, from_pos=self.pos)
         for cand in cands[: m.cfg["firefighter"]["target_candidates"]]:
             path, _ = m.plan(self.pos, cand, self.belief, self._blocked_first())
             if path is not None:
@@ -263,14 +314,20 @@ class Firefighter(mesa.Agent):
             if self.assigned_zone is not None:
                 t = self.target_cell
                 stale = self.steps_since_plan >= m.cfg["firefighter"]["replan_every"]
-                if t is None or not self._is_fuel(t) or stale:
+                valid = t is not None and (self._is_fuel(t) or self.belief.state[t] == CellState.BURNING)
+                if not valid or stale:
                     self._choose_zone_target()
                 return self.target_cell
-            if m.cfg["firefighter"]["explore_when_idle"] and not m.shared_belief.burning_mask().any():
-                self._choose_explore_target()
-                return self._explore_target
+            if not m.shared_belief.burning_mask().any():
+                self._free_since = None
+                self.fallback = False
+                self.target_cell = None
+                if m.cfg["firefighter"]["explore_when_idle"]:
+                    self._choose_explore_target()
+                    return self._explore_target
+                return None
             self._explore_target = None
-            return None
+            return self._await_award_or_fallback()
         # independent: nearest fire this firefighter knows of, else explore on its own
         fire = self._nearest_known_fire()
         self.target_cell = fire
@@ -282,15 +339,38 @@ class Firefighter(mesa.Agent):
             return self._explore_target
         return None
 
+    def _await_award_or_fallback(self) -> Cell | None:
+        """Wait for an AWARD; after ``award_timeout`` silent steps, fight the nearest known fire alone.
+
+        This is the Coordinator-failure fallback from Review 1: if the Coordinator stops
+        allocating, firefighters degrade to greedy nearest-fire behaviour instead of idling.
+        """
+        m = self.model
+        timeout = m.cfg["firefighter"]["award_timeout"]
+        if self._free_since is None:
+            self._free_since = m.steps
+        if timeout is None or m.steps - self._free_since < timeout:
+            return None
+        if not self.fallback:
+            self.fallback = True
+            m.log_event("fallback", agent=self.unique_id)
+        self.target_cell = self._nearest_known_fire()
+        return self.target_cell
+
     # ------------------------------------------------------------------ navigation
     def _unsafe_to_enter(self, cell: Cell) -> bool:
-        """Entering ``cell`` now would put us on believed fuel next to believed fire just as it spreads."""
+        """Entering ``cell`` now would put us on fuel near known fire just as the fire spreads.
+
+        The buffer is 2 cells because the map may be a little out of date near the fire front.
+        """
         m = self.model
         if not m.cfg["firefighter"]["secure_footing"] or not m.fire_spreads_this_step:
             return False
         if not self._is_fuel(cell):
             return False
-        return any(self.belief.state[b] == CellState.BURNING for b in neighbours(cell, m.width, m.height, NEIGHBOURS_8))
+        x, y = cell
+        near = self.belief.state[max(0, x - 2) : x + 3, max(0, y - 2) : y + 3]
+        return bool((near == CellState.BURNING).any())
 
     def _blocked_first(self) -> set[Cell]:
         return self.model.reserved - {self.pos}
@@ -374,8 +454,7 @@ class Firefighter(mesa.Agent):
         """Report DONE(contained) once our zone has no believed-burning cells left."""
         if not self.coordinated or self.assigned_zone is None:
             return
-        zone = self._zone()
-        if zone is None or not any(self.belief.state[c] == CellState.BURNING for c in zone.cells):
+        if self._zone() is None:  # nothing of our zone still burns
             self._send_done("contained")
 
     def step(self) -> None:
@@ -384,13 +463,13 @@ class Firefighter(mesa.Agent):
         self.sense()
         self._check_zone()
 
+        if self.model.cfg["firefighter"]["secure_footing"] and self._standing_at_risk():
+            self.cut_firebreak(retarget=False)  # safety first: never stand on fuel next to fire
+            return
         if self.water <= 0:
             self._refill()
             return
         burning = self._adjacent_burning()
-        if burning and self.model.cfg["firefighter"]["secure_footing"] and self._standing_at_risk():
-            self.cut_firebreak(retarget=False)  # clear our own cell first: never fight from fuel
-            return
         if burning:
             self.extinguish(burning)
             return

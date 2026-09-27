@@ -30,6 +30,7 @@ class Coordinator(mesa.Agent):
         self.assignments: dict[int, int] = {}  # firefighter id -> zone id
         self.next_zone_id = 0
         self._bids: list[Bid] = []
+        self.failed = False
         model.bus.subscribe("coordinator", self.receive)
 
     # ------------------------------------------------------------------ messages
@@ -49,7 +50,15 @@ class Coordinator(mesa.Agent):
     def recluster(self) -> None:
         """Rebuild the zone table from the shared belief map and release stale assignments."""
         m = self.model
-        result = cluster_zones(m.shared_belief.state, m.fuel, m.wind, m.cfg["fire"], self.zones, self.next_zone_id)
+        result = cluster_zones(
+            m.shared_belief.state,
+            m.fuel,
+            m.wind,
+            m.cfg["fire"],
+            self.zones,
+            self.next_zone_id,
+            m.cfg["coordinator"]["zone_link_distance"],
+        )
         self.zones = result.zones
         self.next_zone_id = result.next_id
         for zid in sorted(result.removed_ids):
@@ -149,10 +158,18 @@ class Coordinator(mesa.Agent):
 
     # ------------------------------------------------------------------ main loop
     def step(self) -> None:
-        """Every ``cluster_every`` steps: cluster, release, allocate."""
+        """Every ``cluster_every`` steps: cluster, release, allocate. In between, allocate as soon
+        as a firefighter becomes free (event-driven). Does nothing once failed."""
         m = self.model
-        if m.steps % m.cfg["coordinator"]["cluster_every"] != 0:
+        fail_at = m.cfg["coordinator"]["fail_at_step"]
+        if fail_at is not None and m.steps >= fail_at:
+            if not self.failed:  # robustness test: the Coordinator goes silent for good
+                self.failed = True
+                m.log_event("coordinator_failed")
             return
-        self.recluster()
-        self.release_absent()
-        self.allocate()
+        if m.steps % m.cfg["coordinator"]["cluster_every"] == 0:
+            self.recluster()
+            self.release_absent()
+            self.allocate()
+        elif self.zones and any(ff.unique_id not in self.assignments for ff in m.firefighters):
+            self.allocate()  # event-driven: a firefighter just became free, re-allocate it now

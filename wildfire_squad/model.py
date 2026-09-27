@@ -225,8 +225,19 @@ class WildfireModel(mesa.Model):
                 ff.remove()
                 self.agents_lost += 1
 
+    def _grant_oracle_knowledge(self) -> None:
+        """Studies only: overwrite every belief map with the ground truth (perfect information)."""
+        maps = {id(self.shared_belief): self.shared_belief}
+        maps.update({id(ff.belief): ff.belief for ff in self.firefighters})
+        for belief in maps.values():
+            belief.state[:] = self.state
+            belief.seen_step[:] = self.steps
+            belief.version += 1
+
     def step(self) -> None:
         """Advance the simulation by one step (see class docstring for the order)."""
+        if self.cfg["simulation"]["oracle_knowledge"]:
+            self._grant_oracle_knowledge()
         for scout in self.scouts:
             scout.step()
         if self.coordinator is not None:

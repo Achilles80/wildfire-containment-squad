@@ -115,9 +115,37 @@ def place_ignitions(state: np.ndarray, cfg: dict[str, Any], rng: np.random.Gener
     return chosen
 
 
+def generate_competing_forest(
+    cfg: dict[str, Any], rng: np.random.Generator
+) -> tuple[np.ndarray, np.ndarray, list[Cell]]:
+    """Targeted allocation test: a low-threat fire near the base and a high-threat fire far away.
+
+    The near ignition sits in a patch of sparse forest (slow spread) and is usually found first;
+    the far ignition sits in dense forest (fast spread). A threat-blind allocator sends its crews
+    to the near fire; a threat-aware one should prioritise the far fire.
+    """
+    preset = cfg["presets"]["competing"]
+    state, fuel = generate_forest(cfg, rng)
+    width, height = state.shape
+    r = preset["patch_radius"]
+    for (cx, cy), patch_fuel in ((preset["near_ignition"], "fuel_sparse"), (preset["far_ignition"], "fuel_dense")):
+        xs = slice(max(0, cx - r), min(width, cx + r + 1))
+        ys = slice(max(0, cy - r), min(height, cy + r + 1))
+        patch = state[xs, ys]
+        patch[patch == CellState.WATER] = CellState.TREE  # keep both fires on land
+        fuel[xs, ys] = np.where(patch == CellState.TREE, cfg["fire"][patch_fuel], 0.0)
+        state[cx, cy] = CellState.TREE
+        fuel[cx, cy] = cfg["fire"][patch_fuel]
+    ignitions = [tuple(preset["near_ignition"]), tuple(preset["far_ignition"])]
+    return state, fuel, [(int(x), int(y)) for x, y in ignitions]
+
+
 def build_forest(cfg: dict[str, Any], rng: np.random.Generator) -> tuple[np.ndarray, np.ndarray, list[Cell]]:
     """Generate the map selected by ``simulation.preset`` plus its ignition cells."""
-    if cfg["simulation"].get("preset") == "river":
+    preset = cfg["simulation"].get("preset")
+    if preset == "competing":
+        return generate_competing_forest(cfg, rng)
+    if preset == "river":
         state, fuel = generate_river_forest(cfg, rng)
     else:
         state, fuel = generate_forest(cfg, rng)
