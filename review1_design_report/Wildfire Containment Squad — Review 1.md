@@ -60,7 +60,7 @@ Here T is tree cells, t is simulation steps, A is firefighter agents, and the de
 | --- | --- |
 | Performance | Burning cells extinguished; firebreak cells cut in front of the fire; zones contained; not being caught in fire |
 | Environment | Forest grid on the ground; burning, burnt, tree, water and firebreak cells; other firefighters; limited water supply |
-| Actuators | Move one cell in 4 directions; extinguish an adjacent burning cell; cut a firebreak on an adjacent tree cell; refill at a water cell; send bids to the Coordinator |
+| Actuators | Move one cell in 4 directions; extinguish an adjacent burning cell; cut a firebreak on the tree cell it stands on; refill at a water cell; send bids to the Coordinator |
 | Sensors | Local view with a radius of 1 cell; read access to the shared belief map; own position and water level; task awards from the Coordinator |
 
 ### 3.3 Coordinator
@@ -79,22 +79,22 @@ The environment is partially observable, stochastic, sequential, dynamic, discre
 | Property | Classification | Justification | What it forces in the design |
 | --- | --- | --- | --- |
 | Observability | Partially observable | Scouts see a radius of 3 cells and firefighters a radius of 1; no agent sees the whole grid | A shared belief map with a timestamp per cell |
-| Determinism | Stochastic | Each step, a burning cell ignites a neighbour with a probability that depends on wind and fuel | Plans are re-computed as the fire moves; nothing is planned once |
+| Determinism | Stochastic | Each fire update, a burning cell ignites a neighbour with a probability that depends on wind and fuel | Plans are re-computed as the fire moves; nothing is planned once |
 | Episodic vs sequential | Sequential | A firebreak cut now changes which cells can burn later | Agents reason about future spread, not just the current state |
-| Static vs dynamic | Dynamic | The fire spreads every step whether or not agents act | Fast algorithms (A\* with a good heuristic) and bounded re-planning |
+| Static vs dynamic | Dynamic | The fire keeps spreading whether or not agents act | Fast algorithms (A\* with a good heuristic) and bounded re-planning |
 | Discrete vs continuous | Discrete | Grid cells, a finite set of cell states and actions, and discrete time steps | Search over a finite state space is well defined |
 | Single vs multi-agent | Multi-agent, cooperative | 9 agents share one team score | Coordination through a shared map and auctions; conflicts over zones and cells |
 | Known vs unknown | Known rules, unknown state | The spread model is known to agents, but where the fire currently is must be discovered | Scouts explore; the Coordinator can use the spread model to predict fire fronts |
 
 **Cell states.** Each cell is one of: Tree (fuel), Burning, Burnt, Firebreak, Water or Empty ground. Only Tree cells can ignite.
 
-**Fire-spread model.** At each step, a Tree cell next to a Burning cell ignites with probability:
+**Fire-spread model.** At each fire update, a Tree cell next to a Burning cell ignites with probability:
 
 $$
 P(\text{ignite}) = p_{\text{base}} \times f_{\text{fuel}} \times \left(1 + k \cdot \cos\theta\right)
 $$
 
-Here p\_base = 0.3 by default, f\_fuel is 1.0 for dense forest and 0.5 for sparse forest, θ is the angle between the wind direction and the direction of spread, and k = 0.8 sets wind strength. Downwind spread (θ = 0) is therefore up to 1.8 times the base rate, while upwind spread (θ = 180°) drops to 0.2 times. A burning cell becomes Burnt after 4 steps.
+Here p\_base = 0.3 by default, f\_fuel is 1.0 for dense forest and 0.5 for sparse forest, θ is the angle between the wind direction and the direction of spread, and k = 0.8 sets wind strength. Downwind spread (θ = 0) is therefore up to 1.8 times the base rate, while upwind spread (θ = 180°) drops to 0.2 times. A burning cell becomes Burnt after 4 fire updates. The fire updates once every 5 simulation steps, so agents get 5 actions for every move of the fire front, the way ground crews and drones move faster than a fire spreads. With an update every step the fire would cross the 50 × 50 forest in about 100 steps, faster than any team could respond, and no strategy could be told apart from another.
 
 ## 5. Agent analysis
 
@@ -111,22 +111,22 @@ Scouts are goal-based agents, while Firefighters and the Coordinator are utility
 1. Sense: read every cell within radius 3 and the wind.
 2. Update: write observations and timestamps to the shared belief map.
 3. Choose goal: the frontier cell with the highest exploration value, where value = age of the information ÷ (1 + distance). Unknown cells count as the oldest.
-4. Act: move one step toward the goal on the shortest path.
+4. Act: fly one cell straight toward the goal (drones fly over everything, so no path search is needed).
 
 ### 5.2 Firefighter decision cycle
 
 1. Sense: read the local radius-1 view, the belief map and any auction announcements.
 2. Bid: for each announced zone, send a bid equal to its utility for that zone (Section 6.4).
-3. On award: plan a path to the zone with A\*.
-4. Act by priority: if water = 0, refill at the nearest water cell. Otherwise, if a burning cell is adjacent, extinguish it. Otherwise, if at the zone's downwind edge, cut a firebreak. Otherwise, take the next A\* step.
-5. Re-plan when the path becomes blocked by fire or the zone is reported contained.
+3. On award: pick the zone's burning cell that stops the most spread per step of travel, and plan a path to it with A\*.
+4. Act by priority: if standing on a tree next to fire, cut that cell into a firebreak first, for safety. Otherwise, if water = 0, refill at the nearest water cell. Otherwise, if a burning cell is adjacent, extinguish the one with the highest downwind spread. Otherwise, if standing on its firebreak target, cut a firebreak there. Otherwise, take the next A\* step toward its target.
+5. Re-plan when the path becomes blocked by fire or the zone is reported contained. If no AWARD arrives within 10 steps while fire is known (the Coordinator has failed), attack the nearest known fire alone.
 
 ### 5.3 Coordinator decision cycle
 
 1. Every 5 steps, group burning cells on the belief map into zones using connected components.
 2. Rank zones by threat: zone size × average downwind ignition probability.
 3. Announce new or changed zones for auction, collect bids and award each zone to the best bidder.
-4. Release a firefighter back to the pool when its zone is contained.
+4. Release a firefighter back to the pool when its zone is contained, and re-allocate it at once rather than waiting for the next round. Take a zone back (REVOKE) from a firefighter that has been away refilling for more than 15 steps.
 
 ## 6. Algorithmic modeling
 
@@ -142,7 +142,7 @@ Navigation is the core search problem that every firefighter solves repeatedly.
 | Initial state | Current position of the firefighter |
 | Actions | Move North, South, East or West into a cell that is not Burning and not Water |
 | Transition model | Position changes by one cell; the move is illegal if the target cell is outside the grid or blocked |
-| Goal test | Position is adjacent to the assigned zone's target cell |
+| Goal test | Position is the assigned target cell, or a cell next to it when the target is burning |
 | Path cost | Sum of step costs, where each step costs 1 + λ × risk of the cell entered (defined below) |
 
 ### 6.2 Formal problem formulation (whole system)
@@ -152,7 +152,7 @@ Navigation is the core search problem that every firefighter solves repeatedly.
 | State | State of every cell + position, water and task of every agent + wind |
 | Initial state | 1 to 3 ignition points on a random or preset forest map; all agents at the base station |
 | Actions | The joint action of all agents in one step |
-| Transition model | Apply agent actions, then apply stochastic fire spread (Section 4) |
+| Transition model | Apply agent actions, then apply stochastic fire spread (Section 4) on every fifth step |
 | Goal test | No Burning cell remains, or the step limit t\_max = 300 is reached |
 | Objective | Maximise the Score from Section 3 |
 
@@ -184,7 +184,7 @@ $$
 U(f, z) = \frac{\text{threat}(z)}{1 + \text{pathcost}(f, z)} \times \frac{\text{water}_f}{\text{water}_{\max}}
 $$
 
-Threat(z) is zone size × average downwind ignition probability, and pathcost comes from A\*. The highest bidder wins; zones with more than 20 burning cells are auctioned twice so two firefighters can be assigned.
+Threat(z) is zone size × average downwind ignition probability, and pathcost comes from A\*. The highest bidder wins; zones with more than 20 burning cells are auctioned twice so two firefighters can be assigned. Once every zone has its slots, any firefighter still free is auctioned one extra slot, so nobody stays idle while fire is known.
 
 ```
 for zone in sorted(zones, key=threat, reverse=True):
@@ -247,10 +247,11 @@ Agents coordinate in two ways: implicitly, by reading and writing the shared bel
 | --- | --- | --- | --- |
 | OBSERVE | Scout → Belief map | Cell states seen, step number | Every step |
 | TARGET | Scout → Other scouts | Chosen frontier cell | When a scout picks a new target |
-| ANNOUNCE | Coordinator → Firefighters | Zone id, cells, threat score | When a zone appears, merges or splits |
+| ANNOUNCE | Coordinator → Firefighters | Zone id, cells, threat score | When a zone appears, merges or splits, or has an open slot |
 | BID | Firefighter → Coordinator | Zone id, utility value | In reply to ANNOUNCE, if free |
 | AWARD | Coordinator → Firefighter | Zone id, target cell | After bids close |
 | DONE | Firefighter → Coordinator | Zone id, status (contained / abandoned) | When the zone has no burning cells or the agent must retreat |
+| REVOKE | Coordinator → Firefighter | Zone id, reason | When the firefighter has been away refilling for more than 15 steps, or its zone has disappeared |
 
 ### 8.2 Conflicts and how they are resolved
 
@@ -276,7 +277,7 @@ The system will be built in Python with Mesa, and tested on six scenarios compar
 | Tool | Purpose | Why this one |
 | --- | --- | --- |
 | Python 3 | Implementation language | Team familiarity; strong libraries |
-| Mesa | Agent-based modelling: grid, scheduler, browser visualisation | Built for multi-agent simulations; live grid view for the demo |
+| Mesa | Agent-based modelling (Mesa 3): agents, grid, data collection, browser visualisation; agents are stepped in a fixed order | Built for multi-agent simulations; live grid view for the demo |
 | NumPy | Grid state and spread probabilities | Fast array operations on 2,500 cells |
 | heapq (standard library) | Priority queue for A\* | No extra dependency |
 | Matplotlib | Result charts for the test report | Standard, simple |
@@ -285,10 +286,16 @@ The system will be built in Python with Mesa, and tested on six scenarios compar
 
 ```
 wildfire_squad/
-├── config.yaml            # grid size, agent counts, wind, weights
-├── model.py               # WildfireModel: grid, scheduler, step loop
+├── config.yaml            # every parameter: grid, agents, fire, wind, weights
+├── model.py               # WildfireModel: grid, fixed step order, metrics
+├── belief_map.py          # shared belief map with timestamps
+├── messages.py            # message types and the message bus
+├── strategies.py          # independent | greedy | auction
+├── scenarios.py           # the six test scenarios
 ├── environment/
-│   └── fire.py            # spread model, cell states
+│   ├── cells.py           # cell states
+│   ├── forest.py          # forest maps and presets
+│   └── fire.py            # spread model
 ├── agents/
 │   ├── scout.py
 │   ├── firefighter.py
@@ -296,10 +303,11 @@ wildfire_squad/
 ├── algorithms/
 │   ├── astar.py
 │   ├── auction.py
-│   └── frontier.py
-├── belief_map.py
+│   ├── frontier.py
+│   └── zones.py
 ├── run_experiments.py     # batch runs + metrics
-└── app.py                 # Mesa visualisation
+├── app.py                 # Mesa + Solara visualisation
+└── tests/                 # unit tests
 ```
 
 Every parameter lives in config.yaml, so the same code runs 3 agents or 30 without changes.
@@ -346,7 +354,7 @@ These are the questions evaluators are most likely to ask, with short answers ev
 | Why an auction instead of the Hungarian algorithm? | Zones change every few steps. The auction is decentralised, cheap to re-run and uses each agent's own cost, while the Hungarian method needs full central recomputation each time. |
 | How do you handle partial observability? | A shared belief map with timestamps. Stale cells become frontier cells, so scouts revisit them. |
 | What makes the environment stochastic? | Ignition is probabilistic and depends on wind and fuel, so the same state can lead to different next states. |
-| Is the Coordinator a single point of failure? | Yes, in the current design. A fallback is for firefighters to switch to greedy nearest-zone behaviour if no AWARD arrives within 10 steps. We can mention this as a robustness extension. |
+| Is the Coordinator a single point of failure? | It would be, so the design includes a fallback: a firefighter that knows about fire but receives no AWARD for 10 steps attacks the nearest known fire on its own, so the team keeps working. |
 | How will you prove coordination helps? | By comparing three strategies over 30 seeded runs per scenario, with forest saved as the main metric. |
 | What are the limitations? | 2D grid only, simplified spread model, instant communication, no terrain slope. These are future scope. |
 
