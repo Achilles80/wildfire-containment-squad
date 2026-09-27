@@ -1,0 +1,3 @@
+a,b,mean_diff,ci95,a_better,runs
+"auction, Coordinator fails @60, fallback on","auction, Coordinator fails @60, no fallback",16.81239070761124,4.928443824179324,26,30
+"auction, Coordinator fails @60, fallback on","auction, Coordinator works",4.6034966425726305,4.131360225638366,17,30

@@ -1,0 +1,9 @@
+a,b,mean_diff,ci95,a_better,runs
+windy_single | greedy | utility,windy_single | greedy | firebreak,7.082226300899121,3.9712529630574647,19,30
+windy_single | auction | utility,windy_single | auction | firebreak,8.051239072130853,4.224210208625818,18,30
+windy_single | auction | utility,windy_single | independent,13.48810504681689,4.721767048348105,24,30
+windy_single | auction | utility,windy_single | greedy | utility,1.7807416993942848,3.6566402327916356,16,30
+scaling_10 | greedy | utility,scaling_10 | greedy | firebreak,1.6873948622064197,5.239657925329886,18,30
+scaling_10 | auction | utility,scaling_10 | auction | firebreak,5.787839202199523,5.102326792584298,20,30
+scaling_10 | auction | utility,scaling_10 | independent,25.277240232437478,7.356367579408789,26,30
+scaling_10 | auction | utility,scaling_10 | greedy | utility,2.575122798212621,3.9427811486768984,15,30

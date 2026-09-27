@@ -1,0 +1,4 @@
+a,b,mean_diff,ci95,a_better,runs
+auction | link 1,greedy | link 1,-0.7947994230036596,1.983763425710949,17,30
+auction | link 3,greedy | link 3,-0.16746021543793657,1.9261365344406247,21,30
+auction | link 1,independent,6.894505151899482,3.4204355835190494,24,30
