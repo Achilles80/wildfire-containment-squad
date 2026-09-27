@@ -19,7 +19,9 @@ Wildfire Containment Squad is a multi-agent system in which scout drones and fir
 
 The system separates perception from action: scouts build a shared picture of the fire, the Coordinator turns that picture into tasks, and firefighters execute them. This division of labour is what makes it a genuine multi-agent system rather than several agents working side by side.
 
-&#91;embedded content: System architecture · 3 agent types, 1 shared map, 1 environment\]
+![System architecture · 3 agent types, 1 shared map, 1 environment](review1_assets/architecture.png)
+
+*System architecture · 3 agent types, 1 shared map, 1 environment*
 
 Read the loop clockwise from the bottom: the environment produces local percepts, scouts fuse them into the shared map, the Coordinator auctions fire zones, firefighters bid and act, and their actions change the environment.
 
@@ -213,7 +215,7 @@ A\* is chosen for navigation because it is the only candidate that is both optim
 | DFS | No on graphs with cycles unless tracked; paths can be very long | No | O(b^m) / O(bm) | Rejected |
 | Uniform-cost search | Yes | Yes | Expands in every direction; slow when re-planning often | Baseline for comparison |
 | Greedy best-first | No | No; it can walk straight into high-risk cells | Fast, but unreliable | Rejected |
-| **A* (Manhattan)*\* | **Yes** | **Yes, since h is admissible** | Expands far fewer nodes than UCS | **Chosen** |
+| **A\* (Manhattan)** | **Yes** | **Yes, since h is admissible** | Expands far fewer nodes than UCS | **Chosen** |
 
 On a 50 × 50 grid there are at most 2,500 nodes, so a single A\* call is bounded and cheap. In Review 2 we will measure nodes expanded by UCS versus A\* to show the heuristic's benefit with real numbers.
 
