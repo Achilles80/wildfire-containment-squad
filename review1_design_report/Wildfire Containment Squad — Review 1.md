@@ -19,7 +19,7 @@ Wildfire Containment Squad is a multi-agent system in which scout drones and fir
 
 The system separates perception from action: scouts build a shared picture of the fire, the Coordinator turns that picture into tasks, and firefighters execute them. This division of labour is what makes it a genuine multi-agent system rather than several agents working side by side.
 
-![System architecture · 3 agent types, 1 shared map, 1 environment](review1_assets/architecture.png)
+![System architecture · 3 agent types, 1 shared map, 1 environment](assets/architecture.png)
 
 *System architecture · 3 agent types, 1 shared map, 1 environment*
 

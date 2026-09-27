@@ -1,10 +1,11 @@
-# Presentation material — Review 2
+# Review 2 — implementation plan, slides and study guide
 
 Team: Adithya Ajay (CB.SC.U4CSE23102), Amrith B (CB.SC.U4CSE23105),
 Gowreesh B (CB.SC.U4CSE23119), Vinaayak Kanagaraj (CB.SC.U4CSE23152).
 
 | File | What it is |
 |---|---|
+| `IMPLEMENTATION_PLAN.md` | The specification the implementation was built from: rubric, parameters, build phases |
 | `Review 2 slides.pdf` | The 12-slide Review 2 deck (16:9) |
 | `Review 2 speaker notes.md` | What each speaker says on each slide |
 | `Study guide.pdf` | The full study guide: how the system works, results, viva question bank, presentation plan |

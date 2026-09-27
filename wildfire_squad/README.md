@@ -14,8 +14,10 @@ of the Review 1 report is listed in [§9.1](#91-differences-from-the-review-1-re
 **Team:** Adithya Ajay (CB.SC.U4CSE23102), Amrith B (CB.SC.U4CSE23105),
 Gowreesh B (CB.SC.U4CSE23119), Vinaayak Kanagaraj (CB.SC.U4CSE23152).
 
-**Presentation material** (in [`../presentation/`](../presentation/)): the Review 2 slides
-(`Review 2 slides.pdf`) and the study guide (`Study guide.pdf`, `Study guide.md`).
+**Review documents:** the Review 1 design report is in [`../review1_design_report/`](../review1_design_report/);
+the implementation plan, Review 2 slides, speaker notes and study guide are in
+[`../review2_implementation_docs/`](../review2_implementation_docs/). [`../PROJECT_STRUCTURE.txt`](../PROJECT_STRUCTURE.txt)
+explains every folder.
 
 ### Where each Review 2 criterion is evidenced
 
