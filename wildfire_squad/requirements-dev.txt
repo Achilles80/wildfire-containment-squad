@@ -1,0 +1,4 @@
+# Optional developer tools (not needed to run the demo, experiments or tests).
+-r requirements.txt
+pytest-cov==7.1.0    # coverage report: python -m pytest --cov
+ruff==0.16.9         # linting and formatting: ruff check . && ruff format .

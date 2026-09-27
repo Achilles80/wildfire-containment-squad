@@ -1,9 +1,12 @@
-# Tested with Python 3.13 on these exact versions.
-mesa==3.5.1          # agent-based modelling framework (Model, Agent, MultiGrid, DataCollector, Solara controllers)
+# Runtime dependencies. Requires Python 3.12 or newer (Mesa 3.5 needs it).
+# Exact versions: tested on Python 3.12 and 3.13 (Windows 11).
+mesa[viz]==3.5.1     # agent-based modelling framework + its visualisation extra (Solara controllers)
+altair==6.3.0        # required by mesa.visualization (part of the viz extra)
 networkx==3.7        # imported by mesa 3.5 but not declared as its dependency
 solara==1.62.1       # browser UI for the live demo
 numpy==2.5.3         # grid state arrays, vectorised fire spread
 pyyaml==6.0.3        # config.yaml loading
 matplotlib==3.11.2   # demo rendering and experiment charts
 pandas==3.0.6        # experiment result tables
+tabulate==0.10.0     # results table in the demo's comparison panel
 pytest==9.1.1        # unit tests
