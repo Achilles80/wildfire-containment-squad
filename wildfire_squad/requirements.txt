@@ -1,0 +1,9 @@
+# Tested with Python 3.13 on these exact versions.
+mesa==3.5.1          # agent-based modelling framework (Model, Agent, MultiGrid, DataCollector, Solara controllers)
+networkx==3.7        # imported by mesa 3.5 but not declared as its dependency
+solara==1.62.1       # browser UI for the live demo
+numpy==2.5.3         # grid state arrays, vectorised fire spread
+pyyaml==6.0.3        # config.yaml loading
+matplotlib==3.11.2   # demo rendering and experiment charts
+pandas==3.0.6        # experiment result tables
+pytest==9.1.1        # unit tests
