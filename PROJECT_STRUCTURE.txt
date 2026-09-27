@@ -1,0 +1,160 @@
+WILDFIRE CONTAINMENT SQUAD - PROJECT STRUCTURE
+Foundations of Artificial Intelligence - Case Study (multi-agent system)
+
+Team
+  Adithya Ajay          CB.SC.U4CSE23102
+  Amrith B              CB.SC.U4CSE23105
+  Gowreesh B            CB.SC.U4CSE23119
+  Vinaayak Kanagaraj    CB.SC.U4CSE23152
+
+What the project is
+  A Python simulation in which Scout Drones, Firefighters and a Coordinator work
+  together to contain a wind-driven wildfire on a 50 x 50 forest grid. Scouts map
+  the fire into a shared belief map, the Coordinator groups the fire into zones and
+  auctions them, and firefighters bid, travel with risk-aware A* and fight the fire.
+
+Where to start
+  - To understand the project:   review2_implementation_docs/Study guide.pdf
+  - To run it:                   wildfire_squad/README.md (section 1, Setup)
+  - To present it:               review2_implementation_docs/Review 2 slides.pdf
+                                 review2_implementation_docs/Review 2 speaker notes.md
+
+
+FOLDER TREE
+===========
+
+wildfire-containment-squad/
+|
+|-- PROJECT_STRUCTURE.txt          This file: what every folder and file is for.
+|-- .gitignore                     Keeps the virtual environment and caches out of git.
+|
+|-- review1_design_report/         REVIEW 1 - the design (PEAS, environment and agent
+|   |                              analysis, algorithms, search strategy, Q&A).
+|   |-- Wildfire Containment Squad - Review 1.pdf    The report as submitted (PDF).
+|   |-- Wildfire Containment Squad - Review 1.docx   The same report as a Word document.
+|   |-- Wildfire Containment Squad - Review 1.md     The same report as Markdown.
+|   `-- assets/
+|       `-- architecture.png       The system architecture diagram used by the report.
+|
+|-- review2_implementation_docs/   REVIEW 2 - the implementation, its presentation and
+|   |                              study material.
+|   |-- README.md                  Index of this folder.
+|   |-- IMPLEMENTATION_PLAN.md     The specification the code was built from: course
+|   |                              rubric, parameters, build phases, Review 1 reference.
+|   |-- Review 2 slides.pdf        The 12-slide Review 2 presentation.
+|   |-- Review 2 speaker notes.md  Who presents each slide and what to say.
+|   |-- Study guide.pdf            Full study guide: how the system works step by step,
+|   |                              algorithms, results, viva question bank, presentation
+|   |                              plan, quick-reference numbers.
+|   |-- Study guide.md             The same guide as Markdown.
+|   `-- study_guide_assets/        Figures used by Study guide.md (architecture, step
+|                                  flow, results, timing study, tactics study).
+|
+`-- wildfire_squad/                THE IMPLEMENTATION (all code, tests and results).
+    |
+    |-- README.md                  Main technical documentation: setup, demo, experiments,
+    |                              tests, results, design-to-code map, implementation
+    |                              decisions, differences from the Review 1 report.
+    |-- config.yaml                Every simulation parameter in one place (grid, fire,
+    |                              agents, auction, time limit, score weights).
+    |
+    |-- setup.bat / setup.sh       One-click setup: creates .venv and installs packages.
+    |-- run_demo.bat               Starts the live browser demo (http://localhost:8765).
+    |-- run_tests.bat              Runs all 114 tests.
+    |-- run_experiments.bat        Runs the full experiments and studies (--quick = fast check).
+    |-- run.sh                     macOS/Linux version of the three run scripts.
+    |-- requirements.txt           Pinned packages needed to run everything (Python 3.12+).
+    |-- requirements-dev.txt       Extra developer tools (coverage, linting).
+    |-- pytest.ini, ruff.toml,     Settings for the test runner, the linter and the
+    |   .coveragerc                coverage report.
+    |
+    |-- model.py                   WildfireModel: builds the world and agents, runs the six
+    |                              stages of every step in a fixed order, computes metrics
+    |                              and the Review 1 score.
+    |-- belief_map.py              The shared belief map: last seen state and time of every
+    |                              cell; newest observation wins; stale after 15 steps.
+    |-- messages.py                The message types (OBSERVE, TARGET, ANNOUNCE, BID, AWARD,
+    |                              DONE, REVOKE) and the message bus that delivers them.
+    |-- strategies.py              The three strategies compared: independent, greedy, auction.
+    |-- scenarios.py               The six Review 1 test scenarios as config overrides.
+    |-- settings.py                Loads config.yaml and merges scenario overrides onto it.
+    |
+    |-- environment/               THE WORLD
+    |   |-- cells.py               Cell states (Tree, Burning, Burnt, Firebreak, Water, Empty)
+    |   |                          and grid distance helpers.
+    |   |-- forest.py              Builds the forest map: lakes, dense/sparse trees, the river
+    |   |                          preset, ignition points, firefighter start cells.
+    |   `-- fire.py                The fire-spread formula p_base x fuel x (1 + k cos theta),
+    |                              the spread step, and the risk map used by A*.
+    |
+    |-- agents/                    THE THREE AGENT TYPES
+    |   |-- scout.py               Scout Drone: senses radius 3, picks frontier targets,
+    |   |                          reports what it sees.
+    |   |-- firefighter.py         Firefighter: bids for zones, navigates with A*, extinguishes,
+    |   |                          cuts firebreaks, refills water, safety rules, fallback when
+    |   |                          the Coordinator is silent.
+    |   `-- coordinator.py         Coordinator: clusters fire into zones, runs the auctions,
+    |                              re-assigns firefighters that are absent or freed.
+    |
+    |-- algorithms/                THE ALGORITHMS (plain functions, tested directly)
+    |   |-- astar.py               Risk-aware A* search and uniform-cost search (for comparison).
+    |   |-- auction.py             Bid utility, sequential single-item auction, greedy baseline.
+    |   |-- frontier.py            Frontier-based exploration target selection for scouts.
+    |   `-- zones.py               Fire-zone clustering, stable zone ids, threat score,
+    |                              firebreak targets.
+    |
+    |-- app.py                     The live demo (Solara in the browser): map, belief map,
+    |                              auction log, metrics, and the "Compare all 3 strategies"
+    |                              button.
+    |-- run_experiments.py         Main experiment: 6 scenarios x 3 strategies x 30 seeds
+    |                              (720 runs) -> CSV tables and charts in results/.
+    |-- run_studies.py             Supporting studies behind the design decisions (fire time
+    |                              scale, targeting tactics, allocation, Coordinator failure)
+    |                              -> results/studies/.
+    |
+    |-- results/                   OUTPUT OF THE EXPERIMENTS
+    |   |-- results.csv            One row per experiment run.
+    |   |-- summary.csv            Mean and spread of every metric per scenario and strategy.
+    |   |-- paired_gains.csv       Auction minus each baseline on identical fires, with 95%
+    |   |                          confidence intervals.
+    |   |-- forest_saved_by_scenario.png, paired_gains.png, scaling.png, astar_vs_ucs.png
+    |   |                          The result charts used in the slides and study guide.
+    |   `-- studies/               The four supporting studies: *_runs.csv (every run),
+    |                              *_summary.csv, *_paired.csv and one chart each
+    |                              (timing, tactics, allocation, robustness).
+    |
+    `-- tests/                     114 AUTOMATED TESTS (python -m pytest)
+        |-- test_fire.py           Fire formula, burn-out, reproducibility, map presets.
+        |-- test_belief_map.py     Newest observation wins, staleness, passability.
+        |-- test_astar.py          A* is optimal (same cost as UCS) and expands fewer nodes.
+        |-- test_zones.py          Clustering, stable zone ids, threat, firebreak targets.
+        |-- test_auction.py        Bids, winners, tie-breaks, slots, full message flow.
+        |-- test_conflicts.py      No two firefighters on one cell, scout target exclusion,
+        |                          replanning, no deadlock.
+        |-- test_scouts.py         Exploration and shared vs private maps.
+        |-- test_coordination.py   Re-auction, abandon, Coordinator failure and fallback,
+        |                          safety rule, time scale.
+        |-- test_model_smoke.py    Every strategy and scenario runs; 0-30 agents; score formula.
+        |-- test_tools.py          The demo helpers and both experiment scripts.
+        `-- conftest.py            Shared test setup.
+
+
+HOW THE PIECES CONNECT
+======================
+  config.yaml --> settings.py --> model.py --+--> environment/   (the forest and the fire)
+                                             +--> agents/        (scouts, firefighters, Coordinator)
+                                             |        |
+                                             |        +--> algorithms/   (A*, auction, frontier, zones)
+                                             |        +--> belief_map.py + messages.py (shared map, messages)
+                                             |
+            app.py (live demo) --------------+
+            run_experiments.py, run_studies.py --> results/ --> slides and study guide
+
+
+QUICK COMMANDS (from wildfire_squad/)
+=====================================
+  setup.bat                          install everything (Windows; ./setup.sh elsewhere)
+  run_demo.bat                       live demo at http://localhost:8765
+  run_tests.bat                      all 114 tests
+  run_experiments.bat --quick        30-second experiment check
+  run_experiments.bat                full experiments + studies (about 10 minutes)
