@@ -25,7 +25,7 @@ fire:
   wind_direction_deg: 0       # 0 = wind blowing toward +x (east); 90 = toward +y
   burn_duration: 4            # steps a cell burns before becoming Burnt
   spread_neighbourhood: 8     # fire spreads to 8 neighbours
-  spread_every: 5             # impl: fire updates once every N agent steps (1 = literal Review 1 timing; see README)
+  spread_every: 5             # impl: fire updates once every N agent steps (1 = every step, as in the original plan; see README §6.1)
   ignition_min_base_distance: 15  # ignitions at least this far (Chebyshev) from base
   ignition_min_separation: 15     # multiple ignitions at least this far apart
 

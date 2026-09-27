@@ -8,8 +8,8 @@ cells and cut firebreaks while the wildfire spreads stochastically with the wind
 The implementation follows the Review 1 design: the same agents, algorithms, formulas and
 parameters. Where building it forced a decision that Review 1 did not fix, or where testing
 showed that a detail of the plan hurt performance, the change is listed with its evidence in
-[§9 Implementation decisions](#9-implementation-decisions), and every difference from the wording
-of the Review 1 report is listed in [§9.1](#91-differences-from-the-review-1-report).
+[§9 Implementation decisions](#9-implementation-decisions). The Review 1 report was updated before
+its presentation to describe this final design, so the report and the code agree.
 
 **Team:** Adithya Ajay (CB.SC.U4CSE23102), Amrith B (CB.SC.U4CSE23105),
 Gowreesh B (CB.SC.U4CSE23119), Vinaayak Kanagaraj (CB.SC.U4CSE23152).
@@ -206,10 +206,10 @@ Scenarios 2 and 3."*
 
 ### 6.1 Fire time scale — why agents act 5 times per fire update
 
-With the literal Review 1 timing (fire updates every agent step), **every strategy saves the
+With a fire update every agent step (the implementation plan's timing), **every strategy saves the
 same ~11.6%** (auction − independent = +0.0 ± 0.7). **Even firefighters given perfect
 knowledge of the fire save only 15%.** The fire crosses the 50 × 50 forest in about 100
-steps, faster than any team can act, so the literal timing cannot test the hypothesis at all.
+steps, faster than any team can act, so that timing cannot test the hypothesis at all.
 As agents get more actions per fire update, coordination starts to matter: at 5 steps per
 update the auction gains **+14.1 ± 5.7** over independent agents (`studies/timing.png`).
 
@@ -306,7 +306,7 @@ random draw goes through the model's seeded generators.
 Each one is a switch or a value in `config.yaml`, and each is backed by a study or a test.
 
 1. **Fire time scale** (`fire.spread_every: 5`). All Review 1 probabilities are unchanged; agents
-   get 5 actions per fire update. At 1 (literal timing) no strategy, not even perfect
+   get 5 actions per fire update. At 1 (an update every step) no strategy, not even perfect
    knowledge, can make a difference (§6.1).
 2. **Utility-based targeting inside a zone** (`firefighter.zone_tactic: utility`), from Review 1's
    agent analysis. +8 points over the plan's downwind-edge rule (§6.2), which remains
@@ -329,24 +329,21 @@ Each one is a switch or a value in `config.yaml`, and each is backed by a study 
    every cell's fire state starts unknown.
 8. **Idle exploration** (`firefighter.explore_when_idle`). With no known fire, free firefighters
    explore the frontier. This is what makes Scenario 4 (no scouts) work.
-9. **REVOKE message** (one addition to the protocol) for "absent > 15 steps" and "zone gone".
+9. **REVOKE message** (a seventh message beside the plan's six) for "absent > 15 steps" and "zone gone".
 10. **Start cells and yielding.** Firefighters start on distinct base cells. An idle firefighter
     blocking a teammate's only route steps aside.
 11. **Demo layout.** The run controls are Mesa's (`ModelController`, `ModelCreator`); the page
     layout is custom because Mesa 3.5's draggable grid does not render with current Solara.
 
-### 9.1 Differences from the Review 1 report
+### 9.1 How the Review 1 report reflects these decisions
 
-Where the code does not do literally what the Review 1 report says, this is why:
-
-| Review 1 report says | The code does | Why |
-|---|---|---|
-| "A burning cell becomes Burnt after 4 steps" (§4) | Burnt after 4 **fire updates**; the fire updates every 5 agent steps, so 20 agent steps | Decision 1: every probability is unchanged, only the time scale (§6.1) |
-| Actuator: "cut a firebreak on an **adjacent** tree cell" (§3.2) | The firefighter walks onto the tree and converts the cell it is **standing on** (`Firefighter.cut_firebreak`) | Same actuator, one cell per action, no water. Standing on it makes that cell safe the moment it is cut, which is also the safety rule (decision 4) |
-| Goal test: "position is **adjacent** to the assigned zone's target cell" (§6.1) | The goal is the target cell itself when it can be entered (a tree to cut), and its free 4-neighbours when it cannot (a burning cell to extinguish) (`algorithms/astar.py::goal_cells`) | A burning cell must be reached from beside it, as the report says; a tree must be stood on to be cut |
-| Mesa provides "grid, **scheduler**" (§9.1) | Mesa 3 removed schedulers; `WildfireModel.step()` calls scouts, Coordinator and firefighters in a fixed order itself | The plan required the Mesa 3 API; a fixed order also makes the conflict rules deterministic |
-| Firefighter: "if at the zone's downwind edge, cut a firebreak" (§5.2) | Targets the burning cell of its zone that stops the most spread per step of travel; the downwind edge is the fallback, and remains selectable (`zone_tactic: firebreak`) | Decision 2: Review 1 §5 calls the firefighter utility-based; +8.1 points (§6.2) |
-| Six message types (§8.1) | Seven: REVOKE added | Decision 9 |
+The Review 1 design report (`../review1_design_report/`) describes the final design, so there is
+nothing in it that the code does differently. In particular it states that the fire updates every
+5 steps, that a firefighter cuts a firebreak on the tree it stands on and puts safety first, that
+it targets the zone cell stopping the most spread, the Coordinator-failure fallback, event-driven
+re-allocation and the REVOKE message. Decisions 1 to 10 above are therefore changes relative to
+the original implementation plan (`../review2_implementation_docs/IMPLEMENTATION_PLAN.md`), not
+relative to the Review 1 report.
 
 ## 10. Viva quick answers
 
@@ -359,7 +356,6 @@ Where the code does not do literally what the Review 1 report says, this is why:
 | Partial observability? | Belief-map toggle in the demo; scouts vs no scouts (+6.9 with shared map even without scouts) |
 | Does coordination help? | Yes: significant in 7 of 8 configurations, growing with team size |
 | Auction vs greedy? | Significant only with multiple fires (S3); otherwise tied, because one or two zones leave no real choice (§5 findings) |
-| Why not the literal fire timing? | §6.1: at literal timing even perfect knowledge saves only 15%; nothing can be compared |
+| Why does the fire update only every 5 steps? | §6.1: with an update every step even perfect knowledge saves only 15%; nothing can be compared |
 | Single point of failure? | Switch "Coordinator fails at step" in the demo: the fallback keeps the team working (+16.8 vs no fallback) |
-| Why does the code differ from the report here and there? | §9.1 lists every difference and its reason |
 | Limitations | 2D grid, simplified spread, instant communication, no slope; agents act 5× per fire update; auction ≈ greedy with few zones |

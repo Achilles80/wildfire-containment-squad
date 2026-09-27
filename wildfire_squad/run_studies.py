@@ -169,7 +169,7 @@ def chart_timing(df: pd.DataFrame, out: Path) -> None:
             label=label,
         )
     ax.set_xticks(sorted(agg["every"].unique()))
-    ax.set_xlabel("Agent steps per fire update (1 = literal Review 1 timing)", color=INK_2)
+    ax.set_xlabel("Agent steps per fire update (1 = a fire update every step)", color=INK_2)
     ax.set_ylabel("% forest saved (mean, ≈95% CI)", color=INK_2)
     ax.set_ylim(0, 100)
     ax.set_title("Fire time scale: when can agents make a difference?", color=INK, loc="left", fontsize=12)

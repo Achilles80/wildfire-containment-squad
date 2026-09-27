@@ -14,7 +14,7 @@ Speaker: Adithya. Rubric: tool and package selection and setup. Stress that the 
 
 ## 4. Six fixed stages per step, seven messages
 
-Speaker: Amrith. Rubric: multi-agent execution and interaction. The fixed order makes every run reproducible and gives every conflict a winner. Conflict rules to mention: the auction resolves two firefighters wanting one zone; reservations in id order resolve two wanting one cell; scouts exclude cells within 5 of each other's targets; the newest observation wins; a blocked path means replan or DONE(abandoned) and re-auction; a firefighter away refilling for more than 15 steps loses its zone. REVOKE is the one message added to Review 1's protocol.
+Speaker: Amrith. Rubric: multi-agent execution and interaction. The fixed order makes every run reproducible and gives every conflict a winner. Conflict rules to mention: the auction resolves two firefighters wanting one zone; reservations in id order resolve two wanting one cell; scouts exclude cells within 5 of each other's targets; the newest observation wins; a blocked path means replan or DONE(abandoned) and re-auction; a firefighter away refilling for more than 15 steps loses its zone. REVOKE lets the Coordinator take a zone back from a firefighter that is away too long or whose zone has gone.
 
 ## 5. Risk-aware A* and a threat-first auction
 
@@ -38,7 +38,7 @@ Speaker: Vinaayak. Say this before anyone asks. Owning the finding reads as rigo
 
 ## 10. Every change from the plan has a study behind it
 
-Speaker: Gowreesh. Each is a switch in config.yaml, so an evaluator can turn it off and see the difference. Time scale: every Review 1 probability is unchanged; only the unit of time changes. Utility targeting is what Review 1's own agent analysis describes: prefer cells that stop the most spread. The fallback answers Review 1's single-point-of-failure question; demo it with the Coordinator-fails slider. Also built in: live zones and event-driven allocation, so crews never chase burnt-out cells or wait idle.
+Speaker: Gowreesh. Each is a switch in config.yaml, so an evaluator can turn it off and see the difference. Time scale: the spread probabilities are unchanged; only the unit of time changes, and the Review 1 report describes it. Utility targeting is what Review 1's own agent analysis describes: prefer cells that stop the most spread. The fallback answers Review 1's single-point-of-failure question; demo it with the Coordinator-fails slider. Also built in: live zones and event-driven allocation, so crews never chase burnt-out cells or wait idle.
 
 ## 11. 0 to 30 agents with no code change
 

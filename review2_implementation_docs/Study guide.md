@@ -65,7 +65,7 @@ Each of the eight criteria (20 marks in total) has concrete evidence you can poi
 **Where marks are most at risk, and the answer ready for each:**
 
 - *"Your results don't fully match Review 1's prediction."* Section 11 has the honest comparison: confirmed for Scenario 2 and team scaling, partly for Scenario 3, not for auction vs greedy in general, with the reason.
-- *"Why do agents act 5 times per fire update when Review 1 says every step?"* Section 12.1: at the literal timing even perfect knowledge saves only 15%, so no strategy can be compared.
+- *"Why do agents act 5 times per fire update?"* Section 12.1: at the literal timing even perfect knowledge saves only 15%, so no strategy can be compared.
 - *"You changed the plan's firebreak rule."* Section 12.2: Review 1 itself calls the firefighter utility-based; the utility rule saves 8 points more, with a 95% confidence interval that excludes zero.
 
 ## The environment
@@ -90,15 +90,15 @@ The random map has 2 lakes, 85% of land is Tree, and 30% of trees sit in rectang
 
 Each fire update, a Tree cell n next to a Burning cell b ignites with this probability:
 
-```latex
+$$
 P(\text{ignite from } b) = p_{\text{base}} \times \text{fuel}(n) \times \left(1 + k \cos\theta\right)
-```
+$$
 
 Here p\_base = 0.3, k = 0.8 and θ is the angle between the wind and the direction from b to n. Several burning neighbours act as independent chances:
 
-```latex
+$$
 P(\text{ignite}) = 1 - \prod_{b} \left(1 - P(\text{ignite from } b)\right)
-```
+$$
 
 A burning cell becomes Burnt after 4 fire updates. Empty, Water, Burnt and Firebreak cells never ignite. Code: `environment/fire.py` (`ignition_probability`, `spread_step`, vectorised with NumPy).
 
@@ -116,15 +116,15 @@ Sparse fuel halves every value in the "per update" column. With two burning neig
 
 ### Time scale
 
-Agents act every step; the fire updates every 5 steps (`fire.spread_every: 5`). Every Review 1 probability is unchanged; agents simply get 5 actions per fire update. At 1 (the literal timing) the fire burns about 90% of the forest in roughly 100 steps and no strategy, not even one with perfect knowledge, saves more than 15% (section 12.1).
+Agents act every step; the fire updates every 5 steps (`fire.spread_every: 5`). Every Review 1 probability is unchanged; agents simply get 5 actions per fire update. At 1 (a fire update every step) the fire burns about 90% of the forest in roughly 100 steps and no strategy, not even one with perfect knowledge, saves more than 15% (section 12.1).
 
 ### When a run ends and how it is scored
 
 A run ends when no cell is burning (contained) or at t\_max = 300 steps. The Review 1 score is:
 
-```latex
+$$
 \text{Score} = 0.7 \cdot \frac{T_{\text{saved}}}{T_{\text{initial}}} - 0.2 \cdot \frac{t_{\text{contain}}}{t_{\max}} - 0.1 \cdot \frac{A_{\text{lost}}}{A_{\text{total}}}
-```
+$$
 
 T is Tree cells (firebreaks do not count as saved), t is steps (t\_max if never contained) and A is firefighters. The primary metric in every chart is **% forest saved** = trees standing at the end ÷ trees at the start × 100. Code: `WildfireModel.score`, `final_metrics`.
 
@@ -207,7 +207,7 @@ Every interaction goes through one `MessageBus` with instant delivery. It counts
 | BID | Firefighter → Coordinator | Zone id, utility U(f, z) | In reply to ANNOUNCE, only if U > 0 |
 | AWARD | Coordinator → winner | Zone id, reference cell | After the bids for that slot close |
 | DONE | Firefighter → Coordinator | Zone id, `contained` or `abandoned` | Zone no longer burns, or no safe path exists |
-| REVOKE | Coordinator → firefighter | Zone id, reason (`absent`, `zone_gone`) | Refilling for more than 15 steps, or the zone disappeared (the one type added to Review 1) |
+| REVOKE | Coordinator → firefighter | Zone id, reason (`absent`, `zone_gone`) | Refilling for more than 15 steps, or the zone disappeared (lets the Coordinator take a zone back) |
 
 ### A worked auction round (illustrative numbers)
 
@@ -243,9 +243,9 @@ For every cell it stores the last observed state (−1 = unknown) and `seen_step
 
 Candidates are unknown or stale cells; the **frontier** is the candidates next to a known, fresh cell. A scout at position p picks:
 
-```latex
+$$
 \text{target} = \arg\max_{c \in \text{frontier}} \frac{\text{age}(c)}{1 + \text{chebyshev}(p, c)}, \qquad \text{age}(\text{unknown}) = t_{\max} + 1 = 301
-```
+$$
 
 Cells within 5 (Chebyshev) of another scout's published target are skipped. If that rules out the whole frontier (early on, when it is a small ring round the base), every unknown or stale cell becomes a candidate. The scout re-picks only when it reaches the target or anyone observes it. Three scouts explore more than 80% of the map (`test_scouts.py`).
 
@@ -255,9 +255,9 @@ Cells within 5 (Chebyshev) of another scout's published target are skipped. If t
 - **Stable ids:** each old zone's id goes to the new component that overlaps it most. A merge keeps the id with the largest overlap; in a split the largest piece keeps the id and the rest get new ids; a zone with no successor is removed (its firefighters get REVOKE).
 - **Live zones:** between clustering rounds a firefighter tracks its zone as the burning cells connected to the last snapshot, so it never chases a cell that has already burnt out.
 
-```latex
+$$
 \text{threat}(z) = |z| \times \operatorname{mean}_{n \in N(z)} \max_{b \in z,\ b \sim n} P(\text{ignite } n \text{ from } b)
-```
+$$
 
 N(z) is the believed-Tree cells touching the zone. A big zone with wind pushing it into dense forest scores highest. Each zone also gets a **reference cell** on its downwind edge, the cell used to price bids.
 
@@ -265,15 +265,15 @@ N(z) is the believed-Tree cells touching the zone. A big zone with wind pushing 
 
 The search runs on a 4-connected grid; Burning and Water cells cannot be entered. Entering cell n costs:
 
-```latex
+$$
 c(n) = 1 + \lambda \cdot \text{risk}(n), \qquad \text{risk}(n) = \max_{b \text{ burning next to } n} P(\text{ignite } n \text{ from } b), \qquad \lambda = 5
-```
+$$
 
 So a step costs 1 far from fire and up to 1 + 5 × 0.54 = 3.7 right downwind of it. The heuristic is Manhattan distance to the nearest goal cell (the target, or its free neighbours if the target itself is burning):
 
-```latex
+$$
 h(n) = \min_{g \in \text{goals}} \left(|x_n - x_g| + |y_n - y_g|\right)
-```
+$$
 
 - **Admissible:** every move changes x or y by exactly 1 and costs at least 1, so the true remaining cost is at least the number of moves, which is at least h(n). A\* therefore returns an optimal path.
 - **Consistent:** h changes by at most 1 per move while each move costs at least 1, so h(n) ≤ c(n → n′) + h(n′) and no node is expanded twice.
@@ -284,9 +284,9 @@ h(n) = \min_{g \in \text{goals}} \left(|x_n - x_g| + |y_n - y_g|\right)
 
 ### 5. Sequential single-item auction (`algorithms/auction.py`)
 
-```latex
+$$
 U(f, z) = \frac{\text{threat}(z)}{1 + \text{pathcost}(f, z)} \times \frac{\text{water}_f}{\text{water}_{\max}}
-```
+$$
 
 - Zones are auctioned in decreasing threat; a zone above 20 cells has 2 slots.
 - For each slot: ANNOUNCE to every free firefighter, collect positive BIDs, AWARD the highest (tie → lower id), remove the winner from the pool, repeat.
@@ -298,15 +298,15 @@ U(f, z) = \frac{\text{threat}(z)}{1 + \text{pathcost}(f, z)} \times \frac{\text{
 
 Once assigned, a firefighter picks the zone's burning cell b with the highest:
 
-```latex
+$$
 \text{value}(b) = \frac{\sum_{n \text{ fuel next to } b} P(\text{ignite } n \text{ from } b)}{1 + \text{manhattan}(\text{firefighter}, b)}
-```
+$$
 
 This means "spread stopped per step of travel". Cells a teammate already targets are skipped. It is the utility-based behaviour Review 1 describes, and it saves 8 points more than the plan's downwind-edge rule (section 12.2).
 
 ## Conflicts and how each is resolved
 
-Every conflict that can arise between agents has one deterministic rule and a test that checks it. The first six are the Review 1 conflict table; the last three came up during implementation.
+Every conflict that can arise between agents has one deterministic rule and a test that checks it. The first six are the Review 1 conflict table; the last three are the recovery rules the design adds.
 
 | Conflict | Example | Rule | Code | Test |
 | --- | --- | --- | --- | --- |
@@ -458,7 +458,7 @@ Four studies (`run_studies.py`, 1,090 runs) test the choices the implementation 
 
 *results/studies/timing\_summary.csv · 5 time scales × 4 variants × 20 seeds*
 
-At the literal Review 1 timing (1 on the x axis) all three strategies save the same 11.6% (auction minus independent = +0.0 ± 0.7), and even firefighters told the true fire state save only 15%. The fire crosses the forest in about 100 steps, faster than any team can act, so the literal timing cannot test Review 1's hypothesis at all. As agents get more actions per update, coordination starts to pay: at 5 the auction gains +14.1 ± 5.7 over independent agents. Every probability stays exactly as in Review 1; only the unit of time changes.
+With a fire update every step (1 on the x axis) all three strategies save the same 11.6% (auction minus independent = +0.0 ± 0.7), and even firefighters told the true fire state save only 15%. The fire crosses the forest in about 100 steps, faster than any team can act, so at that timing no strategy can be told apart from another. As agents get more actions per update, coordination starts to pay: at 5 the auction gains +14.1 ± 5.7 over independent agents. Every probability stays exactly as in Review 1; only the unit of time changes.
 
 ### 12.2 What a firefighter targets inside its zone
 
@@ -564,7 +564,7 @@ Each answer is short enough to say in about 20 seconds and ends with something y
 | Why stochastic? | Ignition is random, 0.3 × fuel × (1 + 0.8 cos θ), so the same state can lead to different next states. |
 | Why dynamic and sequential? | The fire moves whether or not agents act, and a firebreak cut now changes what burns later. |
 | Why model-based and not reflex? | A reflex agent has no memory of cells it cannot see, and the fire is almost always partly out of view. |
-| Why do agents act 5 times per fire update? | At the literal timing even perfect knowledge saves 15% and all strategies tie; every Review 1 probability is unchanged (timing chart, section 12.1). |
+| Why do agents act 5 times per fire update? | With a fire update every step even perfect knowledge saves 15% and all strategies tie; the spread probabilities are unchanged (timing chart, section 12.1). |
 
 ### Algorithms
 
@@ -597,17 +597,17 @@ Each answer is short enough to say in about 20 seconds and ends with something y
 | Limitations? | 2D grid; simplified spread; instant, perfect communication; no terrain slope; agents act 5× per fire update; auction ≈ greedy with few zones. |
 | Future work? | Communication delays and losses, a decentralised auction with no Coordinator at all, terrain and real GIS maps, learning the targeting utility from data. |
 
-### Where the code differs from the Review 1 report
+### Design choices an examiner may probe
 
-An examiner comparing the report with the code may find these five differences. Each is deliberate and has an answer.
+The Review 1 report describes the design exactly as built, so there are no differences to defend. These five choices still draw questions.
 
-| Review 1 says | The code does | Say |
-| --- | --- | --- |
-| A burning cell becomes Burnt after 4 steps | After 4 **fire updates**; the fire updates every 5 agent steps, so 20 agent steps | "The probabilities are unchanged; agents act 5 times per fire update because at the literal timing even perfect knowledge saves only 15% (timing study)." |
-| Cut a firebreak on an **adjacent** tree cell | Converts the tree it is **standing on**, after walking onto it | "Same actuator, same one cell per action, no water. Standing on the cell makes it safe the instant it is cut, which is also how a firefighter protects itself next to fire (losses fell from 0.9 to 0.1 per run)." |
-| Goal test: position **adjacent** to the zone's target cell | Walks **to** the target cell; if that cell is burning or water, to a free cell next to it | "A burning target is reached from next to it, exactly as the report says; a tree target is stood on so it can be cut. `goal_cells` in `astar.py` implements both cases." |
-| Mesa provides the grid and a **scheduler** | Mesa 3 removed schedulers, so `WildfireModel.step()` calls the agents in a fixed order itself | "The plan required the Mesa 3 API; a fixed order is also what makes the conflict rules deterministic." |
-| At the zone's downwind edge, cut a firebreak | Goes to the burning cell that stops the most spread per step of travel; the downwind edge is the fallback when nothing is worth putting out | "Review 1 calls the firefighter utility-based so it can prefer cells that stop the most spread; that rule saves 8 points more (tactics study)." |
+| Question | Say |
+| --- | --- |
+| Why does the fire update only every 5 steps? | "Ground crews and drones move faster than a fire front, so agents get 5 actions per fire update. With an update every step even perfect knowledge saves only 15% and no strategy can be told apart (timing study). The spread probabilities themselves are unchanged." |
+| Why cut a firebreak on the cell you stand on? | "Same actuator, one cell per action, no water. Standing on it makes that cell safe the moment it is cut, which is also the safety rule: losses fell from 0.9 to 0.1 per run." |
+| Why is the goal the target itself, not the cell next to it? | "A tree target must be stood on to be cut; a burning target is reached from the next cell, because firefighters cannot enter fire. `goal_cells` in `astar.py` handles both." |
+| Where is Mesa's scheduler? | "Mesa 3 removed schedulers; `WildfireModel.step()` calls the agents in a fixed order itself, which also makes every conflict rule deterministic." |
+| Why not always attack the downwind edge? | "The head of the fire outruns anyone working there. Picking the cell that stops the most spread per step of travel saves 8 points more (tactics study)." |
 
 ## Presentation plan
 

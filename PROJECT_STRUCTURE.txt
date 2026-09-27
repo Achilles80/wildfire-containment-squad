@@ -30,7 +30,7 @@ wildfire-containment-squad/
 |
 |-- review1_design_report/         REVIEW 1 - the design (PEAS, environment and agent
 |   |                              analysis, algorithms, search strategy, Q&A).
-|   |-- Wildfire Containment Squad - Review 1.pdf    The report as submitted (PDF).
+|   |-- Wildfire Containment Squad - Review 1.pdf    The design report (PDF).
 |   |-- Wildfire Containment Squad - Review 1.docx   The same report as a Word document.
 |   |-- Wildfire Containment Squad - Review 1.md     The same report as Markdown.
 |   `-- assets/
