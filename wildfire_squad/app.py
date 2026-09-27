@@ -18,6 +18,7 @@ from __future__ import annotations
 from typing import Any
 
 import numpy as np
+import pandas as pd
 import solara
 from matplotlib.figure import Figure
 from mesa.visualization.solara_viz import ModelController, ModelCreator
@@ -62,6 +63,7 @@ class DemoModel(WildfireModel):
         wind_k: float = _DEFAULTS["fire"]["wind_k"],
         ignitions: int = _DEFAULTS["fire"]["ignitions"],
         spread_every: int = _DEFAULTS["fire"]["spread_every"],
+        coordinator_fails_at: int = 0,
         seed: int = _DEFAULTS["seed"],
     ) -> None:
         overrides: dict[str, Any] = {
@@ -73,6 +75,7 @@ class DemoModel(WildfireModel):
                 "ignitions": ignitions,
                 "spread_every": spread_every,
             },
+            "coordinator": {"fail_at_step": coordinator_fails_at or None},  # 0 = never fails
         }
         if preset != "custom":
             overrides = deep_merge(overrides, scenario_overrides(preset))
@@ -145,6 +148,51 @@ def draw_grid(model: WildfireModel, belief: bool) -> Figure:
     return fig
 
 
+def settings_summary(model: WildfireModel) -> str:
+    """One line describing the run currently on screen (the sliders do not show their values)."""
+    cfg = model.cfg
+    fire, agents = cfg["fire"], cfg["agents"]
+    fail = cfg["coordinator"]["fail_at_step"]
+    coordinator = "none" if model.coordinator is None else (f"fails at step {fail}" if fail else "working")
+    return (
+        f"Strategy **{model.strategy.name}** · preset **{getattr(model, 'preset', 'custom')}** · "
+        f"seed **{model.seed_value}** · scouts {agents['n_scouts']} · firefighters {agents['n_firefighters']} · "
+        f"wind {fire['wind_direction_deg']}° k={fire['wind_k']:g} · ignitions {fire['ignitions']} · "
+        f"fire updates every {fire['spread_every']} steps · Coordinator {coordinator}"
+    )
+
+
+def compare_strategies(cfg: dict[str, Any]) -> tuple[pd.DataFrame, list[tuple[str, np.ndarray]]]:
+    """Run independent, greedy and auction headless on exactly this configuration and seed.
+
+    Returns a results table and the final ground-truth image of each run.
+    """
+    rows, images = [], []
+    for name in STRATEGIES:
+        run_cfg = deep_merge(cfg, {"simulation": {"strategy": name, "measure_ucs": False}})
+        m = WildfireModel(run_cfg)
+        r = m.run()
+        rows.append(
+            {
+                "strategy": name,
+                "% forest saved": round(r["pct_forest_saved"], 1),
+                "steps": r["steps"],
+                "contained": "yes" if r["contained"] else "no",
+                "firefighters lost": r["agents_lost"],
+                "cells extinguished": r["cells_extinguished"],
+                "messages": r["messages"],
+            }
+        )
+        images.append((name, state_image(m.state, m.fuel, cfg["fire"]["fuel_dense"])))
+    return pd.DataFrame(rows), images
+
+
+@solara.lab.task
+def comparison_task(cfg: dict[str, Any]) -> tuple[pd.DataFrame, list[tuple[str, np.ndarray]]]:
+    """Background task behind the Compare button (keeps the page responsive)."""
+    return compare_strategies(cfg)
+
+
 # ----------------------------------------------------------------------------- components
 @solara.component
 def GridView(model: WildfireModel) -> None:
@@ -171,6 +219,8 @@ def SidePanel(model: WildfireModel) -> None:
     burning = int((model.state == CellState.BURNING).sum())
     status = "contained" if model.t_contain is not None else ("running" if model.running else "time limit")
     lines = [
+        settings_summary(model),
+        "",
         f"### {model.pct_forest_saved:.1f}% forest saved",
         f"Step **{model.steps}** / {model.t_max} · strategy **{model.strategy.name}** · "
         f"burning cells **{burning}** · firefighters lost **{model.agents_lost}** · {status}",
@@ -226,6 +276,34 @@ def TimeSeries(model: WildfireModel) -> None:
             ax.spines[side].set_visible(False)
     fig.tight_layout()
     solara.FigureMatplotlib(fig, format="png", dpi=100)
+
+
+@solara.component
+def ComparePanel(model: WildfireModel) -> None:
+    """Run all three strategies on the current setup and show them side by side."""
+    with solara.Card("Why multi-agent? Same fire, three strategies"):
+        solara.Button(
+            "Compare all 3 strategies on this exact setup",
+            color="primary",
+            on_click=lambda: comparison_task(model.cfg),
+            disabled=comparison_task.pending,
+        )
+        if comparison_task.pending:
+            solara.ProgressLinear(True)
+            solara.Text("Running independent, greedy and auction to the end (a few seconds)…")
+        elif comparison_task.finished and comparison_task.value is not None:
+            table, images = comparison_task.value
+            solara.Markdown(table.to_markdown(index=False))
+            fig = Figure(figsize=(9, 3.2), facecolor="white")
+            for ax, (name, img) in zip(fig.subplots(1, len(images)), images, strict=True):
+                ax.imshow(np.transpose(img, (1, 0, 2)), origin="lower", interpolation="nearest")
+                ax.set_title(name, fontsize=10)
+                ax.set_xticks([])
+                ax.set_yticks([])
+            fig.tight_layout()
+            solara.FigureMatplotlib(fig, format="png", dpi=100)
+        elif comparison_task.error:
+            solara.Error(f"Comparison failed: {comparison_task.exception}")
 
 
 # ----------------------------------------------------------------------------- page
@@ -285,6 +363,14 @@ model_params = {
         "step": 1,
         "label": "Fire updates every N steps",
     },
+    "coordinator_fails_at": {
+        "type": "SliderInt",
+        "value": 0,
+        "min": 0,
+        "max": 200,
+        "step": 10,
+        "label": "Coordinator fails at step (0 = never)",
+    },
     "seed": {"type": "SliderInt", "value": _DEFAULTS["seed"], "min": 0, "max": 99, "step": 1, "label": "Seed"},
 }
 
@@ -319,3 +405,4 @@ def Page() -> None:
             GridView(model.value)
             TimeSeries(model.value)
         SidePanel(model.value)
+    ComparePanel(model.value)
