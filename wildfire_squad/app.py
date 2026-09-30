@@ -20,6 +20,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 import solara
+from matplotlib import patheffects
 from matplotlib.figure import Figure
 from mesa.visualization.solara_viz import ModelController, ModelCreator
 from mesa.visualization.utils import update_counter
@@ -137,14 +138,16 @@ def draw_grid(model: WildfireModel, belief: bool) -> Figure:
     wx, wy = model.wind
     k = model.cfg["fire"]["wind_k"]
     cx, cy = model.width - 6, model.height - 6
+    outline = [patheffects.withStroke(linewidth=3, foreground="black")]
     if k > 0:
-        ax.annotate(
+        arrow = ax.annotate(
             "",
             xy=(cx + 4 * wx, cy + 4 * wy),
             xytext=(cx - 4 * wx, cy - 4 * wy),
             arrowprops={"arrowstyle": "-|>", "color": "white", "lw": 2.5},
         )
-    ax.text(cx, cy - 5, f"wind k={k:g}", color="white", ha="center", fontsize=8, weight="bold")
+        arrow.arrow_patch.set_path_effects([patheffects.withStroke(linewidth=4.5, foreground="black")])
+    ax.text(cx, cy - 5.5, f"wind k={k:g}", color="white", ha="center", fontsize=8, weight="bold", path_effects=outline)
     return fig
 
 
@@ -369,10 +372,24 @@ model_params = {
         "min": 0,
         "max": 200,
         "step": 10,
-        "label": "Coordinator fails at step (0 = never)",
+        "label": "Coordinator failure step",
     },
     "seed": {"type": "SliderInt", "value": _DEFAULTS["seed"], "min": 0, "max": 99, "step": 1, "label": "Seed"},
 }
+
+
+HEADER_HTML = (
+    '<div style="background:#14213D; color:#F7F5EF; padding:18px 28px; border-radius:12px; margin:8px 0 16px; '
+    'font-family:Segoe UI, Roboto, Arial, sans-serif">'
+    '<div style="font-size:26px; font-weight:600; letter-spacing:0.2px">Wildfire Containment Squad</div>'
+    '<div style="font-size:15px; color:#C9D3E3; margin-top:4px">'
+    "Scout drones find the fire &middot; the Coordinator auctions fire zones &middot; "
+    "firefighters bid, travel with risk-aware A* and fight it</div></div>"
+)
+PARAMS_HINT_HTML = (
+    '<div style="font-size:13px; color:#5F6B7A; margin:-4px 0 12px; line-height:1.4">'
+    "Changes apply when you press Reset.<br>Coordinator failure step 0 = never fails.</div>"
+)
 
 
 @solara.component
@@ -386,7 +403,7 @@ def Page() -> None:
     use_threads = solara.use_reactive(False)
 
     solara.Title("Wildfire Containment Squad")
-    solara.Markdown("## Wildfire Containment Squad — Scout Drones · Firefighters · Coordinator")
+    solara.HTML(tag="div", unsafe_innerHTML=HEADER_HTML)
     with solara.Columns([1, 2, 1.6]):
         with solara.Column():
             with solara.Card("Run"):
@@ -399,7 +416,8 @@ def Page() -> None:
                 )
                 solara.SliderInt("Play interval (ms)", value=play_interval, min=10, max=500, step=10)
                 solara.SliderInt("Steps per frame", value=render_interval, min=1, max=20)
-            with solara.Card("Parameters (press Reset to apply)"):
+            with solara.Card("Parameters"):
+                solara.HTML(tag="div", unsafe_innerHTML=PARAMS_HINT_HTML)
                 ModelCreator(model, model_params, model_parameters=parameters)
         with solara.Column():
             GridView(model.value)

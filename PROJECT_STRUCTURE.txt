@@ -60,6 +60,9 @@ wildfire-containment-squad/
     |
     |-- setup.bat / setup.sh       One-click setup: creates .venv and installs packages.
     |-- run_demo.bat               Starts the live browser demo (http://localhost:8765).
+    |-- prepare_demo_assets.py     Downloads the demo page's styles, fonts and scripts into
+    |                              .venv once, so the demo looks right even offline (run by
+    |                              setup and run_demo automatically).
     |-- run_tests.bat              Runs all 114 tests.
     |-- run_experiments.bat        Runs the full experiments and studies (--quick = fast check).
     |-- run.sh                     macOS/Linux version of the three run scripts.

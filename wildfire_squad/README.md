@@ -68,8 +68,25 @@ pip install -r requirements.txt
 ## 2. The live demo
 
 ```bash
-solara run app.py          # http://localhost:8765   (or run_demo.bat / ./run.sh demo)
+run_demo.bat               # Windows   -> http://localhost:8765
+./run.sh demo              # macOS / Linux
 ```
+
+Manual equivalent, from an activated `.venv`:
+
+```bash
+python prepare_demo_assets.py           # once: caches the page's styles and fonts locally
+set SOLARA_ASSETS_PROXY=true            # macOS/Linux: export SOLARA_ASSETS_PROXY=true
+solara run app.py
+```
+
+Solara loads the page's styles, fonts and scripts from a CDN. When it is started from a VS
+Code terminal it tells the browser to fetch them from the internet directly, and if that fails
+the page appears unstyled (plain inputs, no layout). `prepare_demo_assets.py` (also run by
+`setup.bat` / `setup.sh`) downloads those files into `.venv` once, and
+`SOLARA_ASSETS_PROXY=true` makes Solara serve them from there, so the demo also works offline.
+If the page ever looks unstyled, stop the server, start it with `run_demo.bat`, and press
+Ctrl+F5 in the browser.
 
 * **Left:** Reset / Play / Step, speed, and every parameter: strategy, scenario preset, number
   of scouts and firefighters, wind direction and strength, ignitions, fire time scale,
@@ -273,6 +290,7 @@ wildfire_squad/
 ├── run_experiments.py       # main study → results/
 ├── run_studies.py           # supporting studies → results/studies/
 ├── app.py                   # live demo
+├── prepare_demo_assets.py   # caches the demo page's styles/fonts so it works offline
 ├── setup.bat / setup.sh, run_*.bat / run.sh
 ├── results/                 # CSVs and charts
 └── tests/                   # 114 pytest tests

@@ -4,7 +4,7 @@ set -e
 cd "$(dirname "$0")"
 . .venv/bin/activate
 case "$1" in
-  demo) solara run app.py ;;
+  demo) python prepare_demo_assets.py || true; SOLARA_ASSETS_PROXY=true solara run app.py ;;
   tests) shift; python -m pytest "$@" ;;
   experiments)
     if [ "$2" = "--quick" ]; then python run_experiments.py --quick
